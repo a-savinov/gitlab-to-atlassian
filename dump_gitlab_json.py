@@ -6,6 +6,12 @@ Export all users/issues from GitLab to JIRA JSON format.
 :author: Dan Blanchard (dblanchard@ets.org)
 :organization: ETS
 :date: May 2014
+:
+:fork: https://github.com/EducationalTestingService/gitlab-to-atlassian
+:added Attachments export
+:autor: Alexey Savinov (aliaksei.savinau@adshare.tv)
+:organization: GoDigital Media Group Company
+:date: September 2016
 '''
 
 import argparse
@@ -88,6 +94,8 @@ def main(argv=None):
         conflict_handler='resolve')
     parser.add_argument('gitlab_url',
                         help='The full URL to your GitLab instance.')
+    parser.add_argument('attachments_url',
+                        help='The full URL to your GitLab attachments.')
     parser.add_argument('-d', '--date_filter',
                         help='Only include issues, notes, etc. created after\
                               the specified date. Expected format is \
@@ -198,18 +206,38 @@ def main(argv=None):
                         key = key[:-1] + chr(suffix)
                 key_set.add(key)
                 jira_project['key'] = key
+                jira_project['type'] = "software"
                 jira_project['description'] = md_to_wiki(project['description'])
                 # jira_project['created'] = project['created_at']
                 jira_project['issues'] = []
                 for issue in project_issues:
                     jira_issue = {}
                     jira_issue['externalId'] = issue['iid']
+                    jira_issue['key'] = str(jira_project['key'])+ "-" + str(issue['iid'])
                     if issue['state'] == 'closed':
                         jira_issue['status'] = 'Closed'
                         jira_issue['resolution'] = 'Resolved'
                     else:
                         jira_issue['status'] = 'Open'
-
+                    jira_issue['attachments'] = []
+                    markup_img = re.findall(r'\!(.+)(?:\]\s|\)\s)', str(issue['description']))
+                    url_img = re.findall('http[s]?://\S+?\.(?:jpg|jpeg|gif|png)', str(issue['description']))
+                    if url_img:
+                        i = 0
+                        j = 0
+                        for mi in markup_img:
+                            i += 1
+                            issue['description'] = issue['description'].replace("!" + mi + ")" , "_XXXXXX_"+ str(i) )
+                        for di in url_img:
+                            di_name = di.split('/')
+                            j += 1
+                            issue['description'] = issue['description'].replace("_XXXXXX_" + str(j), "\n\n!" + di_name[-1] + "!")
+                            img_attach = {}
+                            img_attach['name'] = di_name[-1]
+                            img_attach['uri'] = di
+                            img_attach['attacher'] = issue['author']['username']
+                            img_attach['created'] = issue['created_at']
+                            jira_issue['attachments'].append(img_attach)
                     jira_issue['description'] = md_to_wiki(issue['description'])
                     jira_issue['reporter'] = issue['author']['username']
                     mentioned_users.add(jira_issue['reporter'])
@@ -219,16 +247,47 @@ def main(argv=None):
                         jira_issue['assignee'] = issue['assignee']['username']
                         mentioned_users.add(jira_issue['assignee'])
                     jira_issue['issueType'] = 'Bug'
+                    jira_issue['created'] = issue['created_at']
                     jira_issue['comments'] = []
+
+
+
                     # Get all comments/notes
                     for note in git.getissuewallnotes(project['id'],
                                                       issue['id']):
                         jira_note = {}
+                        jira_attach = {}
+                        markup_img = re.findall(r'\!(.+)(?:\]\s|\)\s)', str(note['body']))
+                        url_img = re.findall('http[s]?://\S+?\.(?:jpg|jpeg|gif|png)', str(note['body']))
+                        if url_img:
+                            i = 0
+                            j = 0
+                        for mi in markup_img:
+                            i += 1
+                            note['body'] = note['body'].replace("!" + mi + ")" , "_XXXXXX_"+ str(i) )
+                        for di in url_img:
+                            di_name = di.split('/')
+                            j += 1
+                            note_attach = {}
+                            note['body'] = note['body'].replace("_XXXXXX_" + str(j), "\n\n!" + di_name[-1] + "|thumbnail!")
+                            note_attach['name'] = di_name[-1]
+                            note_attach['uri'] = di
+                            note_attach['attacher'] = note['author']['username']
+                            note_attach['created'] = note['created_at']
+                            jira_issue['attachments'].append(note_attach)
                         jira_note['body'] = md_to_wiki(note['body'])
                         jira_note['author'] = note['author']['username']
                         mentioned_users.add(jira_note['author'])
                         jira_note['created'] = note['created_at']
                         jira_issue['comments'].append(jira_note)
+                        if note['attachment'] is not None:
+                            # jira_attach = {}
+                            jira_attach['name'] = note['attachment']
+                            jira_attach['attacher'] = note['author']['username']
+                            jira_attach['created'] = note['created_at']
+                            jira_attach['uri'] = args.attachments_url + "/" + str(note['id']) +"/" + note['attachment']
+                            jira_note['body'] = jira_note['body'] + "[^" + note['attachment'] +"]"
+                            jira_issue['attachments'].append(jira_attach)
                     jira_project['issues'].append(jira_issue)
 
                 output_dict['projects'].append(jira_project)
