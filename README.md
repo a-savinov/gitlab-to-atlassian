@@ -12,18 +12,35 @@ This script attempts to export all of the issues (and the users associated with
 them) from GitLab to JIRA. I wrote it in a few hours, but it got the job done.
 I'm posting it on GitHub since other people may also find it useful.
 
+### Prepare data to export
+Copy your data from:
+```
+    / var/opt/gitlab/gitlab-rails/uploads/note/attachment/*
+```
+to any place and make them available through web. 
+For examle:
+```
+    http://attach.example.com/files/note/
+```
+Use this url as "attachments_url" argument
+
+```
+   ./dump_gitlab_json.py -t you_gitlab_tokken  http://gitlab.example.com http://attach.example.com/files/note/ > out.json 
+```
+
 ### Usage
 
 ```
 usage: dump_gitlab_json.py [-h] [-d DATE_FILTER] [-e] [-i IGNORE_LIST]
                            [-p PASSWORD] [-P PAGE_SIZE] [-s] [-t TOKEN]
                            [-u USERNAME] [-v] [--version]
-                           gitlab_url
+                           gitlab_url attachments_url
 
 Export all users/issues from GitLab to JIRA JSON format.
 
 positional arguments:
   gitlab_url            The full URL to your GitLab instance.
+  attachments_url       The full URL to your GitLab attachments.
 
 optional arguments:
   -h, --help            show this help message and exit
