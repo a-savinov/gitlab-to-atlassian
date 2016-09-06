@@ -27,7 +27,7 @@ Use this url as "attachments_url" argument
 ```
    ./dump_gitlab_json.py -t you_gitlab_tokken  http://gitlab.example.com http://attach.example.com/files/note/ > out.json 
 ```
-
+After import project to Jira all attachments will storred on native jira storage and you can delete it from "attachments_url"
 ### Usage
 
 ```
